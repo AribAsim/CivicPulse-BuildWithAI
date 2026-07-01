@@ -1,61 +1,55 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { collection, onSnapshot, query, limit } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../config/firebase';
+import { useNavigate, Link } from 'react-router-dom';
+import { collection, onSnapshot, query, limit, orderBy } from 'firebase/firestore';
+import { db, isFirebaseConfigured, fetchWithAuth } from '../config/firebase';
+import { useAuth } from '../contexts/AuthContext';
 import { 
-  Map as MapIcon, PlusCircle, CheckCircle, ArrowRight, 
-  Activity, ShieldAlert, Sparkles, Lightbulb, TrendingUp, BarChart2, BrainCircuit, Landmark, HelpCircle 
+  AlertTriangle, CheckCircle, TrendingUp, Sparkles, Map as MapIcon, 
+  PlusCircle, ArrowRight, BrainCircuit, Clock, Landmark, ShieldAlert,
+  UserCheck, ChevronRight, FileText, Settings, HelpCircle, Activity
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { user, profile, userRole, setUserRole } = useAuth();
+  
+  // Data States
   const [issues, setIssues] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Stats
-  const [stats, setStats] = useState({
-    suggestionsCount: 0,
-    activePriorities: 0,
-    evidencePoints: 0,
-    communitiesServed: 0
+  // Executive Brief States
+  const [executiveBrief, setExecutiveBrief] = useState<string>(() => {
+    return sessionStorage.getItem('civicpulse_executive_brief') || '';
   });
+  const [generatingBrief, setGeneratingBrief] = useState(false);
 
-  // Automatically trigger Seeding on Home Page load if empty
-  useEffect(() => {
-    const runSeeding = async () => {
-      if (isFirebaseConfigured) {
-        try {
-          await fetch('/api/seed', { method: 'POST' });
-        } catch (err) {
-          console.error("[Seeder] Auto-seeding API call failed:", err);
-        }
-      }
-    };
-    runSeeding();
-  }, []);
-
-  // Sync real-time stats from Firestore
+  // Real-time synchronization
   useEffect(() => {
     if (!isFirebaseConfigured) {
       setLoading(false);
       return;
     }
 
-    const issuesQuery = collection(db, 'issues');
+    // Sync recent issues (Citizen Signals)
+    const issuesQuery = query(collection(db, 'issues'), orderBy('createdAt', 'desc'), limit(10));
     const unsubscribeIssues = onSnapshot(issuesQuery, (snapshot) => {
-      const issuesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setIssues(issuesList);
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setIssues(list);
     }, (error) => {
       console.error("Firestore loading error on HomePage issues:", error);
     });
 
-    const suggestionsQuery = collection(db, 'suggestions');
+    // Sync recent suggestions
+    const suggestionsQuery = query(collection(db, 'suggestions'), orderBy('createdAt', 'desc'), limit(10));
     const unsubscribeSuggestions = onSnapshot(suggestionsQuery, (snapshot) => {
-      const suggestionsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setSuggestions(suggestionsList);
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSuggestions(list);
+      setLoading(false);
     }, (error) => {
       console.error("Firestore loading error on HomePage suggestions:", error);
+      setLoading(false);
     });
 
     return () => {
@@ -64,553 +58,326 @@ export default function HomePage() {
     };
   }, []);
 
-  // Compute live statistics based on real Firestore snapshots
-  useEffect(() => {
-    const suggestionsCount = suggestions.length || 14;
-    const activePriorities = Math.max(3, Math.round(suggestionsCount * 0.4));
-    // Each issue reported is supporting evidence for development decisions
-    const evidencePoints = issues.length || 24;
-    // Estimated count of sectors / neighborhoods based on locations
-    const communitiesServed = Math.max(4, Math.round((suggestionsCount + evidencePoints) * 0.25));
+  // On-demand generation of Executive Brief
+  const handleGenerateBrief = async () => {
+    setGeneratingBrief(true);
+    try {
+      const res = await fetchWithAuth('/api/mp/executive-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const briefText = data.brief || 'Unable to compile brief.';
+        setExecutiveBrief(briefText);
+        sessionStorage.setItem('civicpulse_executive_brief', briefText);
+        toast.success("Executive briefing compiled successfully!");
+      } else {
+        toast.error("Failed to generate brief. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error generating executive brief:", err);
+      toast.error("Network error compiling brief.");
+    } finally {
+      setGeneratingBrief(false);
+    }
+  };
 
-    setStats({
-      suggestionsCount,
-      activePriorities,
-      evidencePoints,
-      communitiesServed
-    });
-    setLoading(false);
-  }, [issues, suggestions]);
+  // Filter priorities (open issues with severity >= 4 or suggestions with high priority scores)
+  const getPriorities = () => {
+    const openHighIssues = issues
+      .filter(i => i.status !== 'resolved' && (i.severity || 1) >= 4)
+      .map(i => ({
+        id: i.id,
+        type: 'issue',
+        title: i.title,
+        category: i.category,
+        urgency: i.severity || 4,
+        address: i.address || 'Unknown address',
+        time: i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : 'Active'
+      }));
+
+    // Limit to top 3 priorities
+    return openHighIssues.slice(0, 3);
+  };
+
+  const priorities = getPriorities();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 56px)' }}>
+    <div style={{ maxWidth: '1200px', margin: '40px auto', padding: '0 24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
       
-      {/* 1. HERO SECTION: Repositioned as Proactive Constituency Planning */}
-      <section 
-        style={{ 
-          padding: '60px 16px 40px 16px', 
-          maxWidth: '1000px', 
-          margin: '0 auto', 
-          textAlign: 'center', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center',
-          gap: '20px',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}
-      >
-        <div 
-          style={{ 
-            fontSize: '11px', 
-            textTransform: 'uppercase', 
-            letterSpacing: '0.15em', 
-            color: '#EC4899',
-            fontWeight: 700,
-            background: 'rgba(236, 72, 153, 0.1)',
-            padding: '6px 14px',
-            borderRadius: '24px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            marginBottom: '8px'
-          }}
-        >
-          <Landmark size={12} />
-          <span>AI-Powered Constituency Planning Platform</span>
+      {/* Platform Welcome Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Constituency Intelligence Command
+          </span>
+          <h1 style={{ marginTop: '4px', fontSize: '32px', fontWeight: 600 }}>Executive Overview</h1>
         </div>
         
-        <h1 style={{ 
-          fontSize: 'clamp(34px, 7vw, 56px)', 
-          fontWeight: 700, 
-          color: 'var(--text-1)', 
-          lineHeight: '1.15', 
-          wordBreak: 'break-word',
-          letterSpacing: '-0.02em',
-          maxWidth: '850px'
-        }}>
-          Plan what should be built next.
-        </h1>
-      </section>
-
-      {/* 2. PRIMARY ACTIONS MATRIX: Redesigned Dashboard-style Entry Buttons */}
-      <section 
-        style={{ 
-          maxWidth: '1200px', 
-          margin: '0 auto', 
-          width: '100%', 
-          padding: '0 24px 40px 24px',
-          boxSizing: 'border-box'
-        }}
-      >
-        <div 
-          style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-            gap: '24px' 
-          }}
-        >
-          {/* Action 1: Suggest Development */}
-          <div 
-            className="card hover-card" 
-            style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              justifyContent: 'space-between',
-              height: '240px',
-              borderLeft: '4px solid #EC4899',
-              background: 'var(--surface)'
-            }}
+        {/* Persona Quick Switcher */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--surface-2)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+          <UserCheck size={16} style={{ color: 'var(--text-2)' }} />
+          <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-2)' }}>Active Persona:</span>
+          <select 
+            value={userRole} 
+            onChange={(e) => setUserRole(e.target.value as 'citizen' | 'mp')}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-1)', fontSize: '12px', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div 
-                style={{ 
-                  width: '40px', 
-                  height: '40px', 
-                  borderRadius: '8px', 
-                  background: 'rgba(236, 72, 153, 0.1)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  color: '#EC4899'
-                }}
-              >
-                <Lightbulb size={22} />
-              </div>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: 'var(--text-1)' }}>1. Suggest Development</h2>
-              <p className="text-sm" style={{ color: 'var(--text-2)', margin: 0 }}>
-                Propose new infrastructure ideas (e.g. clean solar grids, neighborhood clinics, public parks, schools). Voice or text.
-              </p>
-            </div>
-            <button 
-              onClick={() => navigate('/report', { state: { mode: 'suggestion' } })}
-              className="btn btn-primary"
-              style={{ alignSelf: 'flex-start', background: '#EC4899', borderColor: '#EC4899', fontSize: '13px', padding: '8px 16px' }}
-            >
-              Propose Idea <ArrowRight size={14} />
-            </button>
-          </div>
-
-          {/* Action 2: Explore Constituency Needs */}
-          <div 
-            className="card hover-card" 
-            style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              justifyContent: 'space-between',
-              height: '240px',
-              borderLeft: '4px solid var(--primary)',
-              background: 'var(--surface)'
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div 
-                style={{ 
-                  width: '40px', 
-                  height: '40px', 
-                  borderRadius: '8px', 
-                  background: 'var(--primary-subtle)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  color: 'var(--primary)'
-                }}
-              >
-                <MapIcon size={22} />
-              </div>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: 'var(--text-1)' }}>2. Explore Constituency Needs</h2>
-              <p className="text-sm" style={{ color: 'var(--text-2)', margin: 0 }}>
-                View localized citizen demand clusters, development hotspots, and ongoing public feedback overlays on our live map.
-              </p>
-            </div>
-            <button 
-              onClick={() => navigate('/map')}
-              className="btn btn-secondary"
-              style={{ alignSelf: 'flex-start', fontSize: '13px', padding: '8px 16px' }}
-            >
-              Explore Map <ArrowRight size={14} />
-            </button>
-          </div>
-
-          {/* Action 3: View Development Priorities */}
-          <div 
-            className="card hover-card" 
-            style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              justifyContent: 'space-between',
-              height: '240px',
-              borderLeft: '4px solid var(--success)',
-              background: 'var(--surface)'
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div 
-                style={{ 
-                  width: '40px', 
-                  height: '40px', 
-                  borderRadius: '8px', 
-                  background: 'var(--success-subtle)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  color: 'var(--success)'
-                }}
-              >
-                <BarChart2 size={22} />
-              </div>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: 'var(--text-1)' }}>3. Development Priorities</h2>
-              <p className="text-sm" style={{ color: 'var(--text-2)', margin: 0 }}>
-                Inspect the MP Decision Cockpit, AI project rankings, demand trends, and structural infrastructure gap assessments.
-              </p>
-            </div>
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="btn btn-secondary"
-              style={{ alignSelf: 'flex-start', fontSize: '13px', padding: '8px 16px' }}
-            >
-              View Dashboard <ArrowRight size={14} />
-            </button>
-          </div>
-
-          {/* Action 4: AI Insights */}
-          <div 
-            className="card hover-card" 
-            style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              justifyContent: 'space-between',
-              height: '240px',
-              borderLeft: '4px solid var(--warning)',
-              background: 'var(--surface)'
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div 
-                style={{ 
-                  width: '40px', 
-                  height: '40px', 
-                  borderRadius: '8px', 
-                  background: 'var(--warning-subtle)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  color: 'var(--warning)'
-                }}
-              >
-                <BrainCircuit size={22} />
-              </div>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: 'var(--text-1)' }}>4. AI Insights Hub</h2>
-              <p className="text-sm" style={{ color: 'var(--text-2)', margin: 0 }}>
-                Query the grounded LLM on ward statistics, download executive narrative audits, or write specific municipal planning queries.
-              </p>
-            </div>
-            <button 
-              onClick={() => navigate('/insights')}
-              className="btn btn-secondary"
-              style={{ alignSelf: 'flex-start', fontSize: '13px', padding: '8px 16px' }}
-            >
-              Analyze Data <ArrowRight size={14} />
-            </button>
-          </div>
+            <option value="citizen" style={{ background: 'var(--surface)' }}>Citizen Advocate</option>
+            <option value="mp" style={{ background: 'var(--surface)' }}>MP Office (Staff / Official)</option>
+          </select>
         </div>
+      </div>
 
-        {/* Secondary Secondary Actions: Clean Report Problem banner */}
-        <div 
-          style={{ 
-            marginTop: '32px',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-            padding: '16px 24px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ color: 'var(--text-2)' }}>
-              <ShieldAlert size={20} />
-            </div>
-            <div>
-              <strong style={{ fontSize: '14px', color: 'var(--text-1)' }}>Need to report an immediate operational issue?</strong>
-              <p className="text-sm" style={{ color: 'var(--text-3)', margin: 0 }}>
-                Is there something broken in your ward today (e.g. pothole, broken streetlight, water leak, trash)?
-              </p>
-            </div>
+      {/* Main Grid: Today's Priorities & Executive Brief */}
+      <div className="grid-dashboard-top" style={{ gap: '24px' }}>
+        
+        {/* LEFT COLUMN: Today's Priorities */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={18} style={{ color: 'var(--text-1)' }} />
+              Today's Priorities
+            </h2>
+            <p className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+              Critical unresolved issues and high-severity signals needing immediate dispatch attention.
+            </p>
           </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {priorities.length > 0 ? (
+              priorities.map((item) => (
+                <div 
+                  key={item.id}
+                  onClick={() => navigate(`/issue/${item.id}`)}
+                  style={{ 
+                    padding: '14px', 
+                    background: 'var(--surface-2)', 
+                    borderRadius: '8px', 
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-card"
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 6px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-2)', textTransform: 'uppercase' }}>
+                      {item.category}
+                    </span>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-mono)' }}>
+                      SEV: {item.urgency}/5
+                    </span>
+                  </div>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600, margin: 0, color: 'var(--text-1)' }}>
+                    {item.title}
+                  </h4>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    📍 {item.address}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-3)', background: 'var(--surface-2)', borderRadius: '8px' }}>
+                ✓ No high-priority alerts today. Municipal health indicators are stable.
+              </div>
+            )}
+          </div>
+          
           <button 
-            onClick={() => navigate('/report', { state: { mode: 'problem' } })}
-            className="btn btn-secondary text-xs"
-            style={{ padding: '8px 16px', background: 'var(--surface)', borderColor: 'var(--border)' }}
+            onClick={() => navigate('/map')} 
+            className="btn btn-secondary text-xs" 
+            style={{ width: '100%', justifyContent: 'center', fontSize: '12px', marginTop: 'auto' }}
           >
-            Report Problem Issue
+            Explore All Hazards on Map <ArrowRight size={14} />
           </button>
         </div>
-      </section>
 
-      {/* 3. PROACTIVE DATA RELATIONSHIPS: Shows how everything fits together */}
-      <section 
-        style={{ 
-          background: 'var(--surface)', 
-          borderTop: '1px solid var(--border)',
-          borderBottom: '1px solid var(--border)',
-          padding: '50px 16px'
-        }}
-      >
-        <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '30px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--primary)', fontWeight: 600 }}>
-              AI Evidence-Based Recommendations
-            </span>
-            <h2 style={{ marginTop: '8px', fontSize: '28px', fontWeight: 600 }}>How CivicPulse Triangulates Decisions</h2>
-            <p className="text-sm" style={{ color: 'var(--text-2)', maxWidth: '600px', margin: '8px auto 0 auto' }}>
-              We don't just log complaints. We treat civic issues and citizen feedback as powerful evidence data blocks that trigger targeted development proposals.
-            </p>
+        {/* RIGHT COLUMN: Executive Brief Compiler & Viewer */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={18} />
+                Executive Brief
+              </h2>
+              <p className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                Grounded 5-minute legislative overview summarizing citizen demand, gaps, and recommended government schemes.
+              </p>
+            </div>
+            
+            <button
+              onClick={handleGenerateBrief}
+              disabled={generatingBrief}
+              className="btn btn-primary"
+              style={{ padding: '6px 12px', fontSize: '11px' }}
+            >
+              {generatingBrief ? (
+                <>
+                  <div className="shimmer" style={{ width: '10px', height: '10px', borderRadius: '50%' }} />
+                  Compiling...
+                </>
+              ) : (
+                '🔄 Compile Brief'
+              )}
+            </button>
           </div>
 
           <div 
             style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-              gap: '24px',
-              marginTop: '16px'
+              background: 'var(--surface-2)', 
+              border: '1px solid var(--border)', 
+              borderRadius: '8px', 
+              padding: '18px', 
+              minHeight: '220px',
+              maxHeight: '280px',
+              overflowY: 'auto',
+              fontSize: '12.5px',
+              lineHeight: '1.6',
+              color: 'var(--text-1)',
+              fontFamily: 'var(--font-sans)',
+              whiteSpace: 'pre-wrap'
             }}
           >
-            {/* Case Example card */}
-            <div className="card" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', padding: '24px' }}>
-              <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#EC4899', fontWeight: 700, display: 'block', marginBottom: '8px' }}>
-                CITIZEN SUGGESTION INPUT
-              </span>
-              <strong style={{ fontSize: '16px', color: 'var(--text-1)', display: 'block', marginBottom: '6px' }}>
-                💡 Proposal: "Build Primary Health Centre"
-              </strong>
-              <p className="text-sm" style={{ color: 'var(--text-2)', marginBottom: '16px', lineHeight: '1.4' }}>
-                Proposed for the southeast sector near the high density transit ring.
-              </p>
-              
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-3)' }}>SUPPORTING EVIDENCE TRIANGULATION:</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--text-2)' }}>
-                  <span style={{ color: 'var(--danger)' }}>🚨</span>
-                  <span><strong>38 healthcare complaints</strong> (water stagnation, localized medical delays)</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--text-2)' }}>
-                  <span style={{ color: 'var(--primary)' }}>📍</span>
-                  <span><strong>Infrastructure Gap:</strong> Travel time to nearest clinic &gt; 12km</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--text-2)' }}>
-                  <span style={{ color: 'var(--success)' }}>👍</span>
-                  <span><strong>94 resident upvotes</strong> and community verification indicators</span>
-                </div>
+            {executiveBrief ? (
+              executiveBrief
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px', color: 'var(--text-3)', padding: '24px 0' }}>
+                <FileText size={32} style={{ opacity: 0.5 }} />
+                <span>Constituency Brief has not been compiled yet.</span>
+                <button 
+                  onClick={handleGenerateBrief} 
+                  className="btn btn-secondary text-xs" 
+                  style={{ padding: '6px 12px' }}
+                >
+                  Generate First Briefing
+                </button>
               </div>
-            </div>
-
-            {/* AI Decision logic */}
-            <div className="card" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div>
-                <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--primary)', fontWeight: 700, display: 'block', marginBottom: '8px' }}>
-                  AI RECOMMENDATION ENGINE
-                </span>
-                <strong style={{ fontSize: '16px', color: 'var(--text-1)', display: 'block', marginBottom: '6px' }}>
-                  🧠 Demand Cluster & Priority Ranking
-                </strong>
-                <p className="text-sm" style={{ color: 'var(--text-2)', lineHeight: '1.4', marginBottom: '12px' }}>
-                  Our priority algorithm aggregates citizen upvotes, estimated local population reach, travel constraints, and reported complaints to generate an objective **Priority Score (1-100)**.
-                </p>
-                <p className="text-sm" style={{ color: 'var(--text-2)', lineHeight: '1.4' }}>
-                  MPs access the Decision Cockpit to instantly understand: **What to build? Where? Why? Who benefits?** and what direct physical evidence supports the recommendation.
-                </p>
-              </div>
-
-              <div 
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '8px', 
-                  background: 'var(--surface)', 
-                  padding: '10px 14px', 
-                  borderRadius: '6px', 
-                  border: '1px solid var(--border)',
-                  marginTop: '16px'
-                }}
-              >
-                <Sparkles size={16} style={{ color: '#EC4899' }} />
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-1)' }}>
-                  Shift focus from "Fix what is broken" to "Plan what is next"
-                </span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
-      </section>
 
-      {/* 4. MUNICIPAL LIVE STATS BAR */}
-      <section 
-        style={{ 
-          background: 'var(--surface-2)', 
-          borderBottom: '1px solid var(--border)',
-          padding: '30px 16px'
-        }}
-      >
-        <div 
-          className="stats-grid"
-          style={{ 
-            maxWidth: '1200px', 
-            margin: '0 auto', 
-            textAlign: 'center'
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px 0' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Development Suggestions
-            </span>
-            <span style={{ fontSize: '28px', fontWeight: 600, color: '#EC4899' }}>
-              {loading ? "..." : stats.suggestionsCount}
-            </span>
+      </div>
+
+      {/* Bento Grid Part 2: Quick Actions, Demand Map Preview, Recent Citizen Signals */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px' }}>
+        
+        {/* Card 1: Quick Actions */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Quick Actions</h3>
+            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>Direct access channels into platform workflows</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px 0', borderLeft: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Active AI Project Priorities
-            </span>
-            <span style={{ fontSize: '28px', fontWeight: 600, color: 'var(--success)' }}>
-              {loading ? "..." : stats.activePriorities}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px 0', borderLeft: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Supporting Evidence Blocks
-            </span>
-            <span style={{ fontSize: '28px', fontWeight: 600, color: 'var(--primary)' }}>
-              {loading ? "..." : stats.evidencePoints}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px 0', borderLeft: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Constituencies Tracked
-            </span>
-            <span style={{ fontSize: '28px', fontWeight: 600, color: 'var(--warning)' }}>
-              {loading ? "..." : stats.communitiesServed}
-            </span>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'center' }}>
+            <button 
+              onClick={() => navigate('/report', { state: { mode: 'problem' } })}
+              className="btn btn-secondary"
+              style={{ justifyContent: 'space-between', padding: '12px 16px', textAlign: 'left' }}
+            >
+              <span>🚨 Report Ward Problem / Hazard</span>
+              <ChevronRight size={14} />
+            </button>
+            <button 
+              onClick={() => navigate('/report', { state: { mode: 'suggestion' } })}
+              className="btn btn-secondary"
+              style={{ justifyContent: 'space-between', padding: '12px 16px', textAlign: 'left' }}
+            >
+              <span>💡 Propose Development Idea</span>
+              <ChevronRight size={14} />
+            </button>
+            <button 
+              onClick={() => navigate('/planning')}
+              className="btn btn-secondary"
+              style={{ justifyContent: 'space-between', padding: '12px 16px', textAlign: 'left' }}
+            >
+              <span>🏛️ Open MP Decision Cockpit</span>
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
-      </section>
 
-      {/* 5. THE AI CITIZEN PLANNING PIPELINE */}
-      <section 
-        style={{ 
-          padding: '60px 16px', 
-          maxWidth: '1200px', 
-          margin: '0 auto', 
-          width: '100%',
-          boxSizing: 'border-box'
-        }}
-      >
-        <h2 style={{ textAlign: 'center', marginBottom: '40px', fontSize: 'clamp(24px, 5vw, 32px)', fontWeight: 600 }}>
-          Proactive Planning Pipeline
-        </h2>
-        <div 
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '24px'
-          }}
-        >
-          {/* Step 1 */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--surface)' }}>
-            <div 
-              style={{ 
-                width: '36px', 
-                height: '36px', 
-                borderRadius: '6px', 
-                background: 'rgba(236, 72, 153, 0.1)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                color: '#EC4899',
-                fontWeight: 700
-              }}
-            >
-              1
-            </div>
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Citizen Suggestions</h3>
-            <p className="text-sm" style={{ margin: 0, color: 'var(--text-2)' }}>
-              Citizens voice long-term development proposals (water reservoirs, clinics, schools) alongside multi-lingual comments and photo uploads.
-            </p>
+        {/* Card 2: Demand Map Preview */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'space-between' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MapIcon size={16} />
+              Demand Map Preview
+            </h3>
+            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>Live visualization of citizen distress clusters and regional demand</span>
           </div>
 
-          {/* Step 2 */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--surface)' }}>
-            <div 
-              style={{ 
-                width: '36px', 
-                height: '36px', 
-                borderRadius: '6px', 
-                background: 'var(--primary-subtle)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                color: 'var(--primary)',
-                fontWeight: 700
-              }}
-            >
-              2
-            </div>
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>AI Demand Clustering</h3>
-            <p className="text-sm" style={{ margin: 0, color: 'var(--text-2)' }}>
-              Grounded AI clusters matching suggestions, identifies underlying infrastructure gaps, and pulls local complaint logs as physical evidence.
-            </p>
+          {/* Styled schematic placeholder map */}
+          <div style={{ 
+            height: '120px', 
+            background: 'var(--surface-2)', 
+            border: '1px solid var(--border)', 
+            borderRadius: '6px', 
+            position: 'relative',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <div style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.1, background: 'radial-gradient(circle, var(--text-1) 10%, transparent 10%)', backgroundSize: '16px 16px' }} />
+            {/* Styled markers */}
+            <div style={{ position: 'absolute', top: '25%', left: '30%', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--primary)', border: '2px solid var(--bg)', boxShadow: '0 0 8px rgba(0,0,0,0.3)' }} />
+            <div style={{ position: 'absolute', top: '55%', left: '60%', width: '16px', height: '16px', borderRadius: '50%', background: 'var(--primary)', border: '2px solid var(--bg)', opacity: 0.8 }} />
+            <div style={{ position: 'absolute', top: '40%', left: '75%', width: '10px', height: '10px', borderRadius: '50%', background: 'var(--text-2)' }} />
+            
+            <span className="text-mono" style={{ fontSize: '10px', color: 'var(--text-3)', zIndex: 1, padding: '4px 8px', background: 'var(--surface)', borderRadius: '4px', border: '1px solid var(--border)' }}>
+              LIVE FEED • ACTIVE OVERLAYS
+            </span>
           </div>
 
-          {/* Step 3 */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--surface)' }}>
-            <div 
-              style={{ 
-                width: '36px', 
-                height: '36px', 
-                borderRadius: '6px', 
-                background: 'var(--success-subtle)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                color: 'var(--success)',
-                fontWeight: 700
-              }}
-            >
-              3
-            </div>
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Multi-Criteria Ranking</h3>
-            <p className="text-sm" style={{ margin: 0, color: 'var(--text-2)' }}>
-              Proposals are automatically scored based on population coverage, public upvote velocity, distance to nearest facility, and local urgency index.
-            </p>
+          <button 
+            onClick={() => navigate('/map')} 
+            className="btn btn-primary text-xs" 
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            Launch Interactive Map
+          </button>
+        </div>
+
+        {/* Card 3: Recent Citizen Signals */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Activity size={16} />
+              Recent Citizen Signals
+            </h3>
+            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>Latest public demand feed & logs</span>
           </div>
 
-          {/* Step 4 */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--surface)' }}>
-            <div 
-              style={{ 
-                width: '36px', 
-                height: '36px', 
-                borderRadius: '6px', 
-                background: 'var(--warning-subtle)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                color: 'var(--warning)',
-                fontWeight: 700
-              }}
-            >
-              4
-            </div>
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>MP Decision Dashboard</h3>
-            <p className="text-sm" style={{ margin: 0, color: 'var(--text-2)' }}>
-              Members of Parliament review data-backed project templates, download formal audits, and allocate budgets where citizens need them most.
-            </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '180px', overflowY: 'auto' }}>
+            {loading ? (
+              <div className="shimmer" style={{ height: '80px', width: '100%' }} />
+            ) : issues.length > 0 ? (
+              issues.slice(0, 3).map((issue) => (
+                <div 
+                  key={issue.id} 
+                  onClick={() => navigate(`/issue/${issue.id}`)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                  className="hover-card"
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {issue.title}
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>
+                      📂 {issue.category?.toUpperCase()} • {issue.status?.toUpperCase() || 'REPORTED'}
+                    </span>
+                  </div>
+                  <ChevronRight size={14} style={{ color: 'var(--text-3)' }} />
+                </div>
+              ))
+            ) : (
+              <span style={{ fontSize: '12px', color: 'var(--text-3)', textAlign: 'center', padding: '16px 0' }}>No recent citizen signals.</span>
+            )}
           </div>
         </div>
-      </section>
+
+      </div>
 
     </div>
   );

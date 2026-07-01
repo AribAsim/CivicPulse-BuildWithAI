@@ -11,9 +11,9 @@ import { OnboardingModal } from './components/OnboardingModal';
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const MapPage = React.lazy(() => import('./pages/MapPage'));
 const ReportPage = React.lazy(() => import('./pages/ReportPage'));
-const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
+const DevelopmentPage = React.lazy(() => import('./pages/DevelopmentPage'));
 const IssueDetailPage = React.lazy(() => import('./pages/IssueDetailPage'));
-const InsightsPage = React.lazy(() => import('./pages/InsightsPage'));
+const PlanningPage = React.lazy(() => import('./pages/PlanningPage'));
 const ProfilePage = React.lazy(() => import('./pages/ProfilePage'));
 
 // Generic suspense loading wrapper
@@ -53,9 +53,9 @@ function AppContent() {
             <Route path="/" element={<HomePage />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/report" element={<ReportPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/development" element={<DevelopmentPage />} />
             <Route path="/issue/:id" element={<IssueDetailPage />} />
-            <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/planning" element={<PlanningPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Routes>
         </Suspense>
@@ -73,10 +73,12 @@ function AppContent() {
             </span>
           </div>
           <div style={{ display: 'flex', gap: '20px', fontSize: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Link to="/" className="text-muted" style={{ textDecoration: 'none' }}>Overview</Link>
+            <Link to="/development" className="text-muted" style={{ textDecoration: 'none' }}>Development</Link>
             <Link to="/map" className="text-muted" style={{ textDecoration: 'none' }}>Map</Link>
-            <Link to="/dashboard" className="text-muted" style={{ textDecoration: 'none' }}>Dashboard</Link>
-            <Link to="/insights" className="text-muted" style={{ textDecoration: 'none' }}>Insights Analyst</Link>
-            <Link to="/report" className="text-muted" style={{ textDecoration: 'none' }}>Report Hazard</Link>
+            <Link to="/planning" className="text-muted" style={{ textDecoration: 'none' }}>AI Planning</Link>
+            <Link to="/report" className="text-muted" style={{ textDecoration: 'none' }}>Reports</Link>
+            <Link to="/profile" className="text-muted" style={{ textDecoration: 'none' }}>Settings</Link>
           </div>
         </footer>
       )}

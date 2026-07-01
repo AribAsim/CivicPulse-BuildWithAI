@@ -107,17 +107,17 @@ export const Navbar: React.FC = () => {
 
         {/* Desktop Links (Hidden on Mobile) */}
         <div className="navbar-center hide-on-mobile" style={{ gap: '14px', alignItems: 'center' }}>
-          <Link to="/report" state={{ mode: 'suggestion' }} className={`navbar-link ${isActive('/report') && location.state?.mode !== 'problem' ? 'active' : ''}`}>
+          <Link to="/" className={`navbar-link ${isActive('/') ? 'active' : ''}`}>
+            Overview
+          </Link>
+          <Link to="/development" className={`navbar-link ${isActive('/development') ? 'active' : ''}`}>
             Development
           </Link>
           <Link to="/map" className={`navbar-link ${isActive('/map') ? 'active' : ''}`}>
             Map
           </Link>
-          <Link to="/insights" className={`navbar-link ${isActive('/insights') ? 'active' : ''}`}>
-            Insights
-          </Link>
-          <Link to="/dashboard" className={`navbar-link ${isActive('/dashboard') ? 'active' : ''}`}>
-            Dashboard
+          <Link to="/planning" className={`navbar-link ${isActive('/planning') ? 'active' : ''}`}>
+            AI Planning
           </Link>
           <Link to="/profile" className={`navbar-link ${isActive('/profile') ? 'active' : ''}`}>
             Settings
@@ -313,9 +313,16 @@ export const Navbar: React.FC = () => {
           }}
         >
           <Link 
-            to="/report" 
-            state={{ mode: 'suggestion' }}
-            className={`navbar-link ${isActive('/report') && location.state?.mode !== 'problem' ? 'active' : ''}`}
+            to="/" 
+            className={`navbar-link ${isActive('/') ? 'active' : ''}`}
+            style={{ height: '40px', borderBottom: 'none' }}
+            onClick={handleLinkClick}
+          >
+            Overview
+          </Link>
+          <Link 
+            to="/development" 
+            className={`navbar-link ${isActive('/development') ? 'active' : ''}`}
             style={{ height: '40px', borderBottom: 'none' }}
             onClick={handleLinkClick}
           >
@@ -330,20 +337,12 @@ export const Navbar: React.FC = () => {
             Map
           </Link>
           <Link 
-            to="/insights" 
-            className={`navbar-link ${isActive('/insights') ? 'active' : ''}`}
+            to="/planning" 
+            className={`navbar-link ${isActive('/planning') ? 'active' : ''}`}
             style={{ height: '40px', borderBottom: 'none' }}
             onClick={handleLinkClick}
           >
-            Insights
-          </Link>
-          <Link 
-            to="/dashboard" 
-            className={`navbar-link ${isActive('/dashboard') ? 'active' : ''}`}
-            style={{ height: '40px', borderBottom: 'none' }}
-            onClick={handleLinkClick}
-          >
-            Dashboard
+            AI Planning
           </Link>
           <Link 
             to="/profile" 

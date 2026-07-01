@@ -30,6 +30,8 @@ interface AuthContextType {
   loginAnonymously: () => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  userRole: 'citizen' | 'mp';
+  setUserRole: (role: 'citizen' | 'mp') => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,6 +40,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRoleState] = useState<'citizen' | 'mp'>(() => {
+    const saved = localStorage.getItem('civicpulse_user_role');
+    return (saved === 'mp' || saved === 'citizen') ? saved : 'citizen';
+  });
+
+  const setUserRole = (role: 'citizen' | 'mp') => {
+    setUserRoleState(role);
+    localStorage.setItem('civicpulse_user_role', role);
+    toast.success(`Switched view to ${role === 'mp' ? 'MP' : 'Citizen'} persona`);
+  };
 
   const fetchProfile = async (uid: string, currentUser: User) => {
     if (!isFirebaseConfigured) return;
@@ -206,7 +218,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loginWithGoogle,
       loginAnonymously,
       logout,
-      refreshProfile
+      refreshProfile,
+      userRole,
+      setUserRole
     }}>
       {children}
     </AuthContext.Provider>
