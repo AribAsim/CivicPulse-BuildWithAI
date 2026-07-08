@@ -5,11 +5,13 @@ import { Bell, PlusCircle, LogIn, LogOut, User, MapPin, Menu, X, Check, Eye, Sun
 import { toast } from 'react-hot-toast';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../config/firebase';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, loginWithGoogle, loginAnonymously, logout } = useAuth();
+  const { t } = useLanguage();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -108,22 +110,22 @@ export const Navbar: React.FC = () => {
         {/* Desktop Links (Hidden on Mobile) */}
         <div className="navbar-center hide-on-mobile" style={{ gap: '14px', alignItems: 'center' }}>
           <Link to="/" className={`navbar-link ${isActive('/') ? 'active' : ''}`}>
-            Overview
+            {t('overview')}
           </Link>
           <Link to="/development" className={`navbar-link ${isActive('/development') ? 'active' : ''}`}>
-            Development
+            {t('development')}
           </Link>
           <Link to="/map" className={`navbar-link ${isActive('/map') ? 'active' : ''}`}>
-            Map
+            {t('map')}
           </Link>
           <Link to="/planning" className={`navbar-link ${isActive('/planning') ? 'active' : ''}`}>
-            AI Planning
+            {t('aiPlanning')}
           </Link>
           <Link to="/profile" className={`navbar-link ${isActive('/profile') ? 'active' : ''}`}>
-            Settings
+            {t('settings')}
           </Link>
           <Link to="/report" state={{ mode: 'problem' }} className="btn btn-secondary text-xs" style={{ padding: '6px 12px', fontSize: '12px', marginLeft: '8px' }}>
-            Report Problem
+            {t('suggest')}
           </Link>
         </div>
 
@@ -318,7 +320,7 @@ export const Navbar: React.FC = () => {
             style={{ height: '40px', borderBottom: 'none' }}
             onClick={handleLinkClick}
           >
-            Overview
+            {t('overview')}
           </Link>
           <Link 
             to="/development" 
@@ -326,7 +328,7 @@ export const Navbar: React.FC = () => {
             style={{ height: '40px', borderBottom: 'none' }}
             onClick={handleLinkClick}
           >
-            Development
+            {t('development')}
           </Link>
           <Link 
             to="/map" 
@@ -334,7 +336,7 @@ export const Navbar: React.FC = () => {
             style={{ height: '40px', borderBottom: 'none' }}
             onClick={handleLinkClick}
           >
-            Map
+            {t('map')}
           </Link>
           <Link 
             to="/planning" 
@@ -342,7 +344,7 @@ export const Navbar: React.FC = () => {
             style={{ height: '40px', borderBottom: 'none' }}
             onClick={handleLinkClick}
           >
-            AI Planning
+            {t('aiPlanning')}
           </Link>
           <Link 
             to="/profile" 
@@ -350,7 +352,7 @@ export const Navbar: React.FC = () => {
             style={{ height: '40px', borderBottom: 'none' }}
             onClick={handleLinkClick}
           >
-            Settings
+            {t('settings')}
           </Link>
           
           <Link 
@@ -360,7 +362,7 @@ export const Navbar: React.FC = () => {
             style={{ justifyContent: 'center', padding: '10px', marginTop: '4px' }}
             onClick={handleLinkClick}
           >
-            Report Problem
+            {t('suggest')}
           </Link>
 
           {user ? (

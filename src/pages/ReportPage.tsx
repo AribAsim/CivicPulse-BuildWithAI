@@ -1170,7 +1170,7 @@ export default function ReportPage() {
             }}
           >
             <AlertTriangle size={15} />
-            Report Problem
+            Suggest
           </button>
           <button
             type="button"

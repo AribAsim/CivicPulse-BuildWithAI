@@ -6,6 +6,7 @@ import { Navbar } from './components/Navbar';
 import { Toaster } from 'react-hot-toast';
 import { CardSkeleton } from './components/Skeleton';
 import { OnboardingModal } from './components/OnboardingModal';
+import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 
 // Lazy loading all pages for optimal bundle splitting and performance
 const HomePage = React.lazy(() => import('./pages/HomePage'));
@@ -42,6 +43,7 @@ const PageLoader: React.FC = () => (
 function AppContent() {
   const location = useLocation();
   const isMapPage = location.pathname === '/map';
+  const { t } = useLanguage();
 
   return (
     <div className="app-container">
@@ -69,16 +71,16 @@ function AppContent() {
               CIVICPULSE
             </span>
             <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
-              © {new Date().getFullYear()} Municipal Ward Infrastructure Ledger.
+              © {new Date().getFullYear()} {t('footerText')}
             </span>
           </div>
           <div style={{ display: 'flex', gap: '20px', fontSize: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <Link to="/" className="text-muted" style={{ textDecoration: 'none' }}>Overview</Link>
-            <Link to="/development" className="text-muted" style={{ textDecoration: 'none' }}>Development</Link>
-            <Link to="/map" className="text-muted" style={{ textDecoration: 'none' }}>Map</Link>
-            <Link to="/planning" className="text-muted" style={{ textDecoration: 'none' }}>AI Planning</Link>
-            <Link to="/report" className="text-muted" style={{ textDecoration: 'none' }}>Reports</Link>
-            <Link to="/profile" className="text-muted" style={{ textDecoration: 'none' }}>Settings</Link>
+            <Link to="/" className="text-muted" style={{ textDecoration: 'none' }}>{t('overview')}</Link>
+            <Link to="/development" className="text-muted" style={{ textDecoration: 'none' }}>{t('development')}</Link>
+            <Link to="/map" className="text-muted" style={{ textDecoration: 'none' }}>{t('map')}</Link>
+            <Link to="/planning" className="text-muted" style={{ textDecoration: 'none' }}>{t('aiPlanning')}</Link>
+            <Link to="/report" className="text-muted" style={{ textDecoration: 'none' }}>{t('suggest')}</Link>
+            <Link to="/profile" className="text-muted" style={{ textDecoration: 'none' }}>{t('settings')}</Link>
           </div>
         </footer>
       )}
@@ -89,36 +91,38 @@ function AppContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppContent />
-          <Toaster 
-            position="bottom-right"
-            toastOptions={{
-              style: {
-                background: 'var(--surface-2)',
-                color: 'var(--text-1)',
-                border: '1px solid var(--border)',
-                fontFamily: 'var(--font-sans)',
-                fontSize: '13px',
-                borderRadius: '6px'
-              },
-              success: {
-                iconTheme: {
-                  primary: 'var(--success)',
-                  secondary: '#FFFFFF'
+      <LanguageProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppContent />
+            <Toaster 
+              position="bottom-right"
+              toastOptions={{
+                style: {
+                  background: 'var(--surface-2)',
+                  color: 'var(--text-1)',
+                  border: '1px solid var(--border)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '13px',
+                  borderRadius: '6px'
+                },
+                success: {
+                  iconTheme: {
+                    primary: 'var(--success)',
+                    secondary: '#FFFFFF'
+                  }
+                },
+                error: {
+                  iconTheme: {
+                    primary: 'var(--danger)',
+                    secondary: '#FFFFFF'
+                  }
                 }
-              },
-              error: {
-                iconTheme: {
-                  primary: 'var(--danger)',
-                  secondary: '#FFFFFF'
-                }
-              }
-            }}
-          />
-        </BrowserRouter>
-      </AuthProvider>
+              }}
+            />
+          </BrowserRouter>
+        </AuthProvider>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }

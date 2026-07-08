@@ -37,9 +37,9 @@ const app = getApps().some(a => a.name === '[DEFAULT]')
   ? getApp() 
   : initializeApp(firebaseConfig);
 
-const hasDatabaseId = false;
+const hasDatabaseId = !!firebaseConfig.firestoreDatabaseId;
 
-export const db = getFirestore(app);
+export const db = hasDatabaseId ? getFirestore(app, firebaseConfig.firestoreDatabaseId) : getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 

@@ -19,8 +19,21 @@ import * as path from 'path';
 
 import firebaseAppletConfig from '../../firebase-applet-config.json';
 
-// Load config
-const firebaseConfig = firebaseAppletConfig;
+const getEnvVar = (key: string): string => {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key] || '';
+  }
+  return '';
+};
+
+// Load config with environment variable fallbacks and placeholders
+const firebaseConfig = {
+  apiKey: getEnvVar("VITE_FIREBASE_API_KEY") || firebaseAppletConfig.apiKey || "placeholder-key",
+  authDomain: getEnvVar("VITE_FIREBASE_AUTH_DOMAIN") || firebaseAppletConfig.authDomain || "placeholder-auth",
+  projectId: getEnvVar("VITE_FIREBASE_PROJECT_ID") || firebaseAppletConfig.projectId || "placeholder-project",
+  storageBucket: getEnvVar("VITE_FIREBASE_STORAGE_BUCKET") || firebaseAppletConfig.storageBucket || "placeholder-bucket",
+  appId: getEnvVar("VITE_FIREBASE_APP_ID") || firebaseAppletConfig.appId || "placeholder-app-id",
+};
 
 // Initialize client-side Firebase app if not already initialized
 const appName = "admin-fallback";
@@ -28,9 +41,11 @@ const app = getApps().find(a => a.name === appName)
   ? getApp(appName) 
   : initializeApp(firebaseConfig, appName);
 
-const hasDatabaseId = false;
+const hasDatabaseId = !!(firebaseAppletConfig as any).firestoreDatabaseId;
 
-const clientDb = getFirestore(app);
+const clientDb = hasDatabaseId 
+  ? getFirestore(app, (firebaseAppletConfig as any).firestoreDatabaseId) 
+  : getFirestore(app);
 
 // Helper to convert client DocumentSnapshot to Admin-like DocumentSnapshot
 class AdminDocumentSnapshot {

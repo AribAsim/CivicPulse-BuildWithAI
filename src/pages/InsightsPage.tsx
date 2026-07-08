@@ -131,7 +131,7 @@ export default function InsightsPage() {
     toast.success("Report file downloaded successfully.");
   };
 
-  return (
+  return (<>
     <div style={{ maxWidth: '1200px', margin: '40px auto', padding: '0 24px' }}>
       
       {/* Title Header */}
@@ -308,5 +308,6 @@ export default function InsightsPage() {
       </div>
 
     </div>
+    </>
   );
 }

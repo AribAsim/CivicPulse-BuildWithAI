@@ -1,26 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap');
 
 :root {
-  --bg: #FFFFFF;
+  --bg: #F8FAFC;
   --surface: #FFFFFF;
-  --surface-2: #F2F2F2;
-  --border: #E5E5E5;
-  --border-hover: #0A0A0A;
+  --surface-2: #F1F5F9;
+  --border: #E2E8F0;
+  --border-hover: #0F172A;
 
-  --primary: #0A0A0A;
-  --primary-hover: #171717;
-  --primary-subtle: #F2F2F2;
+  --primary: #0F172A;
+  --primary-hover: #1E293B;
+  --primary-subtle: #F1F5F9;
 
-  --success: #0A0A0A;
-  --success-subtle: #F2F2F2;
-  --warning: #737373;
-  --warning-subtle: #F2F2F2;
-  --danger: #0A0A0A;
-  --danger-subtle: #F2F2F2;
+  --success: #10B981;
+  --success-subtle: #ECFDF5;
+  --warning: #F59E0B;
+  --warning-subtle: #FEF3C7;
+  --danger: #EF4444;
+  --danger-subtle: #FEF2F2;
 
-  --text-1: #0A0A0A;
-  --text-2: #737373;
-  --text-3: #A1A1A1;
+  --text-1: #0F172A;
+  --text-2: #475569;
+  --text-3: #94A3B8;
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', sans-serif;
@@ -28,26 +28,26 @@
 }
 
 body.dark {
-  --bg: #0A0A0A;
-  --surface: #121212;
-  --surface-2: #171717;
-  --border: #262626;
-  --border-hover: #FFFFFF;
+  --bg: #090D16;
+  --surface: #131B2E;
+  --surface-2: #1E293B;
+  --border: #1E293B;
+  --border-hover: #F8FAFC;
 
-  --primary: #FFFFFF;
-  --primary-hover: #F2F2F2;
-  --primary-subtle: #171717;
+  --primary: #F8FAFC;
+  --primary-hover: #E2E8F0;
+  --primary-subtle: #1E293B;
 
-  --success: #FFFFFF;
-  --success-subtle: #171717;
-  --warning: #737373;
-  --warning-subtle: #171717;
-  --danger: #FFFFFF;
-  --danger-subtle: #171717;
+  --success: #34D399;
+  --success-subtle: #064E3B;
+  --warning: #FBBF24;
+  --warning-subtle: #78350F;
+  --danger: #F87171;
+  --danger-subtle: #7F1D1D;
 
-  --text-1: #FFFFFF;
-  --text-2: #A1A1A1;
-  --text-3: #737373;
+  --text-1: #F8FAFC;
+  --text-2: #94A3B8;
+  --text-3: #64748B;
 }
 
 body.dark .btn-primary {
@@ -136,15 +136,15 @@ body {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 24px;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01), 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 .card:hover {
   border-color: var(--border-hover);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04) !important;
+  box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.04), 0 4px 12px -5px rgba(0, 0, 0, 0.02);
 }
 .card:active {
   transform: translateY(-1px) scale(0.992);
@@ -635,6 +635,21 @@ h3 {
   .map-filters-strip {
     padding: 12px 12px !important;
   }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 
